@@ -368,6 +368,39 @@
     document.body.classList.remove("proj-mode");
   }
 
+  // -------- éléments de chrome partagés (ambiance « carnet de terrain ») --------
+  const BRAND_TITLE="Mon tournoi";
+  function topbarHtml(){
+    return `<header class="topbar"><div class="topbar-in">
+      <button class="brand" id="brandhome" title="Accueil" aria-label="Aller à l'accueil">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="t"><b>${BRAND_TITLE}</b><span>Volley · système suisse</span></span>
+      </button>
+      <div class="spacer"></div>
+      <button class="theme-btn" id="themebtn" title="Thème clair / sombre" aria-label="Thème"><span class="ic">◐</span><span class="tb-lbl">Thème</span></button>
+    </div></header>`;
+  }
+  const footerHtml=()=>`<footer class="pagefoot">Mon tournoi · gestion de tournoi de volley en système suisse</footer>`;
+  function bindTopbar(){
+    const b=$("#brandhome"); if(b) b.addEventListener("click",()=>{ location.hash="#/"; });
+    const th=$("#themebtn"); if(th) th.addEventListener("click",toggleTheme);
+  }
+  // en-tête de page : filet d'accroche + titre + sous-titre + boutons propres à la page
+  function introBlock(eyebrow, titleHtml, sub, actionsHtml){
+    return `<div class="intro"><div class="intro-main">`
+      +(eyebrow?`<div class="eyebrow">${eyebrow}</div>`:"")
+      +titleHtml
+      +(sub?`<p>${sub}</p>`:"")
+      +`</div>`
+      +(actionsHtml?`<div class="intro-actions">${actionsHtml}</div>`:"")
+      +`</div>`;
+  }
+  // ouvre la présentation dans une NOUVELLE fenêtre (projection sur 2e écran)
+  function openPresentation(id){
+    const url=location.href.split("#")[0]+"#/t/"+id+"/presentation";
+    window.open(url,"tdr_presentation_"+id);
+  }
+
   // -------- accueil / bibliothèque --------
   function viewHome(){
     const list=listTournaments();
@@ -380,9 +413,9 @@
         const s=summarize(t);
         const state = s.allDone
           ? `<span class="pill ok">Terminé${s.champ?` · 🏆 ${esc(s.champ)}`:""}</span>`
-          : (s.doneRounds>0?`<span class="pill run">Ronde ${s.cur+1} / ${s.rounds}</span>`:`<span class="pill new">À démarrer · ${s.rounds} rondes</span>`);
+          : (s.doneRounds>0?`<span class="pill run"><i class="live"></i>Ronde ${s.cur+1} / ${s.rounds}</span>`:`<span class="pill new">À démarrer · ${s.rounds} rondes</span>`);
         return `<article class="tcard" data-id="${t.id}">
-          <div class="tcard-main" data-act="open" data-id="${t.id}">
+          <div class="tcard-main" data-act="open" data-id="${t.id}" role="button" tabindex="0">
             <div class="tcard-name">${esc(t.name)}</div>
             <div class="tcard-meta">${s.teams} équipes · créé le ${fmtDate(t.createdAt)}</div>
             <div class="tcard-state">${state}</div>
@@ -396,31 +429,29 @@
         </article>`;
       }).join("")+`</div>`;
     }
-    app().innerHTML=`
-      <header class="appbar">
-        <div class="brand"><span class="brand-mark">♛</span><span>Tournoi des Rois</span></div>
-        <div class="appbar-actions">
-          <button class="btn ghost" id="themebtn" title="Thème clair / sombre">◐ Thème</button>
-          <button class="btn ghost" id="importbtn">⬆ Importer</button>
-          <button class="btn primary" id="newbtn">＋ Nouveau tournoi</button>
-        </div>
-      </header>
-      <section class="home">
-        <div class="home-head"><h1>Mes tournois</h1><p>${list.length} tournoi${list.length>1?"s":""} enregistré${list.length>1?"s":""} dans ce navigateur.</p></div>
-        ${cards}
-      </section>`;
+    const actions=`<button class="btn ghost" id="importbtn">⬆ Importer</button>`
+      +`<button class="btn primary" id="newbtn">＋ Nouveau tournoi</button>`;
+    app().innerHTML=topbarHtml()
+      +`<main class="wrap"><section class="home">`
+      +introBlock("Bibliothèque", `<h1>Mes tournois</h1>`, "Tes tournois sont enregistrés dans ce navigateur.", actions)
+      +`<div class="page-sub"><span class="count-pill">${list.length} tournoi${list.length>1?"s":""}</span></div>`
+      +cards
+      +`</section></main>`+footerHtml();
 
+    bindTopbar();
     $("#newbtn").addEventListener("click",()=>{ location.hash="#/nouveau"; });
     $("#importbtn").addEventListener("click",()=>$("#importfile").click());
-    $("#themebtn").addEventListener("click",toggleTheme);
-    app().addEventListener("click",e=>{
+    const home=$(".home");
+    const onAct=e=>{
       const b=e.target.closest("[data-act]"); if(!b) return;
       const id=b.dataset.id, act=b.dataset.act;
       if(act==="open"){ location.hash="#/t/"+id+"/config"; }
       else if(act==="export"){ exportTournament(id); }
       else if(act==="dup"){ duplicateTournament(id); viewHome(); }
       else if(act==="del"){ const t=readTournament(id); if(confirm(`Supprimer « ${t?t.name:"ce tournoi"} » ? Cette action est définitive.`)){ deleteTournament(id); viewHome(); } }
-    });
+    };
+    home.addEventListener("click",onAct);
+    home.addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ")&&e.target.classList.contains("tcard-main")){ e.preventDefault(); onAct(e); } });
   }
 
   // -------- création --------
@@ -431,12 +462,10 @@
   }
   function viewCreate(){
     let names=new Array(16).fill("");
-    app().innerHTML=`
-      <header class="appbar">
-        <div class="brand"><button class="btn ghost back" id="backbtn">←</button><span class="brand-mark">♛</span><span>Nouveau tournoi</span></div>
-      </header>
-      <section class="create">
-        <form id="createform" class="form">
+    app().innerHTML=topbarHtml()
+      +`<main class="wrap"><section class="create">`
+      +introBlock("Nouveau", `<h1>Créer un tournoi</h1>`, "Choisis les paramètres et les équipes, puis lance-toi.", "")
+      +`<form id="createform" class="form">
           <div class="field wide"><label for="c_name">Nom du tournoi</label><input id="c_name" type="text" placeholder="Tournoi des Rois" value="Tournoi des Rois"></div>
           <div class="grid6">
             <div class="field"><label for="c_nteams">Équipes</label><input id="c_nteams" type="number" min="4" max="24" step="2" value="16"></div>
@@ -452,22 +481,21 @@
             <button type="button" class="btn ghost" id="cancelbtn">Annuler</button>
             <button type="submit" class="btn primary">Créer le tournoi</button>
           </div>
-        </form>
-      </section>`;
+        </form></section></main>`+footerHtml();
 
+    bindTopbar();
     const grid=$("#c_teams");
     const readNames=()=>$$("#c_teams input").map(i=>i.value);
     const rebuild=n=>{ names=readNames(); grid.innerHTML=teamInputsHtml(names,n); };
     $("#c_nteams").addEventListener("change",e=>{ const n=clampEven(parseInt(e.target.value,10),MINT,MAXT); e.target.value=n;
       const rd=$("#c_nrounds"); rd.max=Math.max(1,n-1); if(+rd.value>+rd.max) rd.value=rd.max; rebuild(n); });
     $("#demobtn").addEventListener("click",()=>{ const n=clampEven(parseInt($("#c_nteams").value,10),MINT,MAXT); names=DEMO_TEAMS.slice(0,n); grid.innerHTML=teamInputsHtml(names,n); });
-    $("#backbtn").addEventListener("click",()=>{ location.hash="#/"; });
     $("#cancelbtn").addEventListener("click",()=>{ location.hash="#/"; });
     $("#createform").addEventListener("submit",e=>{
       e.preventDefault();
       const n=clampEven(parseInt($("#c_nteams").value,10),MINT,MAXT);
       const teams=readNames().slice(0,n); while(teams.length<n)teams.push("");
-      const cfg={teams:n, rounds:parseInt($("#c_nrounds").value,10)||8, courts:3,
+      const cfg={rounds:parseInt($("#c_nrounds").value,10)||8,
         start:parseHHMM($("#c_start").value)!=null?parseHHMM($("#c_start").value):540,
         dur:parseInt($("#c_dur").value,10)||20, brk:parseInt($("#c_brk").value,10)||0};
       const courts=+$("#c_courts").value||3;
@@ -477,11 +505,11 @@
   }
 
   // -------- espace tournoi (pages par étape) --------
-  const STEPS=[{k:"config",label:"Configuration"},{k:"classement",label:"Classement"},{k:"finale",label:"Phase finale"}];
-  function navHtml(route){
-    const steps=S.rounds, R=RD();
+  // Barre de navigation interne du tournoi (onglets + stepper de rondes). Les BOUTONS d'action
+  // propres à chaque page sont rendus dans la page (voir mountStep), pas ici.
+  function tnavHtml(route){
+    const R=RD(), sch=schedules();
     let rondeTabs="";
-    const sch=schedules();
     for(let r=0;r<R;r++){
       const exists=r<sch.length;
       let cls="step todo", st="à venir";
@@ -491,48 +519,29 @@
       rondeTabs+=`<button class="${cls}${active}" data-nav="ronde" data-r="${r}" title="Ronde ${r+1} · ${st}">${r+1}</button>`;
     }
     const tab=(k,label)=>`<button class="tab${route.step===k?" active":""}" data-nav="${k}">${label}</button>`;
-    return `
-      <header class="appbar tbar">
-        <div class="brand"><button class="btn ghost back" data-nav="home" title="Bibliothèque">←</button>
-          <input class="tname" id="tname" value="${esc(ACTIVE.name)}" aria-label="Nom du tournoi"></div>
-        <div class="appbar-actions">
-          <button class="btn ghost" data-nav="presentation" title="Vue projection">📺 Présentation</button>
-          <button class="btn ghost" id="exportbtn" title="Exporter en JSON">⬇ Export</button>
-          <button class="btn ghost" id="themebtn" title="Thème clair / sombre">◐</button>
-        </div>
-      </header>
-      <nav class="tnav">
-        <div class="tnav-tabs">
-          ${tab("config","Configuration")}
-          ${tab("classement","Classement")}
-          <span class="tnav-rounds"><span class="tnav-lab">Rondes</span>${rondeTabs}</span>
-          ${tab("finale","Phase finale")}
-        </div>
-      </nav>
-      <div class="tv-body" id="tvbody"></div>`;
+    return `<nav class="tnav"><div class="tnav-in">
+      ${tab("config","Configuration")}
+      ${tab("classement","Classement")}
+      <span class="tnav-rounds"><span class="tnav-lab">Rondes</span>${rondeTabs}</span>
+      ${tab("finale","Phase finale")}
+    </div></nav>`;
   }
-  function bindNav(route){
-    const go=step=>{ location.hash="#/t/"+ACTIVE.id+"/"+step; };
-    $$("[data-nav]").forEach(b=>b.addEventListener("click",()=>{
-      const n=b.dataset.nav;
-      if(n==="home"){ location.hash="#/"; }
-      else if(n==="ronde"){ location.hash="#/t/"+ACTIVE.id+"/ronde/"+b.dataset.r; }
-      else go(n);
-    }));
-    const tname=$("#tname"); if(tname) tname.addEventListener("change",()=>{ renameActive(tname.value); });
-    const ex=$("#exportbtn"); if(ex) ex.addEventListener("click",()=>exportTournament(ACTIVE.id));
-    const th=$("#themebtn"); if(th) th.addEventListener("click",toggleTheme);
+  function navHtml(route){
+    return topbarHtml()+tnavHtml(route)+`<main class="wrap"><div class="tv-body" id="tvbody"></div></main>`+footerHtml();
   }
-  function renderNav(route){
-    const old=$(".tnav"); if(!old) return;
-    // reconstruit uniquement la barre d'onglets (ne touche pas #tvbody ni le champ nom en édition)
-    const tpl=document.createElement("template"); tpl.innerHTML=navHtml(route);
-    const newNav=tpl.content.querySelector(".tnav"); if(!newNav) return;
-    old.replaceWith(newNav);
+  function bindTnav(){
     $$(".tnav [data-nav]").forEach(b=>b.addEventListener("click",()=>{
       const n=b.dataset.nav;
       if(n==="ronde") location.hash="#/t/"+ACTIVE.id+"/ronde/"+b.dataset.r; else location.hash="#/t/"+ACTIVE.id+"/"+n;
     }));
+  }
+  function renderNav(route){
+    const old=$(".tnav"); if(!old) return;
+    // reconstruit uniquement la barre d'onglets (ne touche pas #tvbody ni les champs en édition)
+    const tpl=document.createElement("template"); tpl.innerHTML=tnavHtml(route);
+    const newNav=tpl.content.querySelector(".tnav"); if(!newNav) return;
+    old.replaceWith(newNav);
+    bindTnav();
   }
 
   function cfgFormHtml(){
@@ -608,23 +617,40 @@
     else { card.innerHTML=cardInner(sch[r],r); }   // ronde non commencée : rebuild sûr
   }
 
+  // bouton d'action « propre à la page » : lancer la présentation (nouvelle fenêtre)
+  const presBtn=`<button class="btn ghost" data-pres title="Ouvre la projection dans une nouvelle fenêtre">📺 Présentation</button>`;
   function mountStep(route){
     const body=$("#tvbody"); if(!body) return;
+    const name=esc(ACTIVE.name);
     if(route.step==="config"){
-      body.innerHTML=`<div class="step-head"><h1>Configuration &amp; équipes</h1><p>Réglages du tournoi et noms des équipes.</p></div>`+cfgFormHtml();
+      const actions=`<button class="btn ghost" id="exportbtn" title="Exporter en JSON">⬇ Export</button>`
+        +`<button class="btn danger" id="delbtn" title="Supprimer ce tournoi">🗑 Supprimer</button>`;
+      body.innerHTML=introBlock("Configuration",
+        `<input class="title-input" id="tname" value="${name}" aria-label="Nom du tournoi">`,
+        "Paramètres du tournoi et noms des équipes.", actions)
+        +cfgFormHtml();
       renderTeams(); syncCfg(); bindCfg(route);
+      const tn=$("#tname"); if(tn) tn.addEventListener("change",()=>renameActive(tn.value));
+      const ex=$("#exportbtn"); if(ex) ex.addEventListener("click",()=>exportTournament(ACTIVE.id));
+      const del=$("#delbtn"); if(del) del.addEventListener("click",()=>{ if(confirm(`Supprimer « ${ACTIVE.name} » ? Cette action est définitive.`)){ deleteTournament(ACTIVE.id); location.hash="#/"; } });
     } else if(route.step==="classement"){
-      body.innerHTML=`<div class="step-head"><h1>Classement</h1><p id="rank-sub">mis à jour en direct</p></div><div class="rankwrap" id="rankwrap"></div>`;
-      renderRank();
+      body.innerHTML=introBlock(name, `<h1>Classement</h1>`, `<span id="rank-sub">mis à jour en direct</span>`, presBtn)
+        +`<div class="rankwrap" id="rankwrap"></div>`;
+      renderRank(); bindPres();
     } else if(route.step==="finale"){
-      body.innerHTML=`<div class="step-head"><h1>Phase finale</h1><p>Moitié haute → tableau principal · moitié basse → consolante · têtes de série en direct.</p></div><div class="finals" id="finals"></div>`;
-      renderFinals();
+      body.innerHTML=introBlock(name, `<h1>Phase finale</h1>`,
+        "Moitié haute → tableau principal · moitié basse → consolante · têtes de série en direct.", presBtn)
+        +`<div class="finals" id="finals"></div>`;
+      renderFinals(); bindPres();
     } else { // ronde
       const r=route.r||0;
-      body.innerHTML=`<div class="step-head"><h1>Ronde ${r+1}</h1><p>Saisis les scores ; le classement et la ronde suivante se calculent tout seuls.</p></div><div id="rounds"></div>`;
-      mountRound(r);
+      body.innerHTML=introBlock(name, `<h1>Ronde ${r+1}</h1>`,
+        "Saisis les scores ; le classement et la ronde suivante se calculent tout seuls.", presBtn)
+        +`<div id="rounds"></div>`;
+      mountRound(r); bindPres();
     }
   }
+  function bindPres(){ const b=$("[data-pres]"); if(b) b.addEventListener("click",()=>openPresentation(ACTIVE.id)); }
 
   function viewTournament(route){
     if(!ACTIVE || ACTIVE.id!==route.id){ if(!setActive(route.id)){ location.hash="#/"; return; } }
@@ -633,7 +659,7 @@
     // borne la ronde demandée
     if(route.step==="ronde"){ const R=RD(); if(route.r==null||route.r<0) route.r=0; if(route.r>=R) route.r=R-1; }
     app().innerHTML=navHtml(route);
-    bindNav(route);
+    bindTopbar(); bindTnav();
     mountStep(route);
   }
 
@@ -652,7 +678,8 @@
       </div>
       <div id="proj"></div>`;
     const setView=v=>{ view=v; try{sessionStorage.setItem(pk,v);}catch(e){} $$(".pjt").forEach(b=>b.classList.toggle("on",b.dataset.v===v)); renderProjection(view); };
-    $$(".pjt").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.v==="exit"){ location.hash="#/t/"+route.id+"/config"; return; } setView(b.dataset.v); }));
+    const exit=()=>{ try{ if(window.opener && !window.opener.closed){ window.close(); return; } }catch(e){} location.hash="#/t/"+route.id+"/config"; };
+    $$(".pjt").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.v==="exit"){ exit(); return; } setView(b.dataset.v); }));
 
     const refresh=()=>{ const t=readTournament(route.id); if(t){ S=t.data; } ensureRounds(); renderProjection(view); };
     setView(view); refresh();
