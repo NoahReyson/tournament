@@ -1,6 +1,6 @@
 name: Deploy to GitHub Pages
 
-# Publie le site (racine du dépôt) sur GitHub Pages à chaque push sur main.
+# Publie le contenu de public/ sur GitHub Pages à chaque push sur main.
 # Prérequis une seule fois : Settings → Pages → Source = "GitHub Actions".
 
 on:
@@ -28,6 +28,6 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: public
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -24,8 +24,8 @@ Aucune donnée ne quitte le navigateur : tout est persisté en local (`localStor
 ## Utilisation
 
 - **En ligne** : page publiée sur GitHub Pages (`https://<utilisateur>.github.io/tournoi-des-rois/`).
-- **En local** : ouvrir directement `index.html` dans un navigateur (double-clic). Tout fonctionne en
-  `file://` — le JavaScript est un script classique, aucun serveur n'est nécessaire.
+- **En local** : ouvrir directement `public/index.html` dans un navigateur (double-clic). Tout
+  fonctionne en `file://` — le JavaScript est un script classique, aucun serveur n'est nécessaire.
 
 ### Navigation (routage par `#`)
 
@@ -40,16 +40,16 @@ Aucune donnée ne quitte le navigateur : tout est persisté en local (`localStor
 
 ```
 tournoi-des-rois/
-├── index.html          # coquille de l'app (monte l'interface via JS)
-├── .nojekyll           # sert les fichiers tels quels (pas de traitement Jekyll)
+├── .github/
+│   └── workflows/
+│       └── pages.yml   # déploie public/ sur GitHub Pages (Source = GitHub Actions)
 ├── README.md
 ├── SPECS.md            # spécifications détaillées
-├── assets/
-│   └── favicon.svg
-├── css/
-│   └── styles.css      # design system (thème clair/sombre, composants)
-└── js/
-    └── app.js          # toute l'app : store, moteur, écrans, routage
+└── public/             # site publié (contenu servi par Pages)
+    ├── index.html      # coquille de l'app (monte l'interface via JS)
+    ├── styles.css      # design system (thème clair/sombre, composants)
+    ├── app.js          # toute l'app : store, moteur, écrans, routage
+    └── favicon.svg
 ```
 
 ### Stockage (localStorage)
@@ -66,10 +66,11 @@ tournoi-des-rois/
 
 ## Déploiement GitHub Pages
 
-1. Pousser l'arborescence sur la branche `main`.
-2. Dépôt → **Settings → Pages** → **Source** « Deploy from a branch », **Branch** `main`, dossier
-   `/ (root)`. Enregistrer.
-3. Au bout de ~1 min, le site est publié sur `https://<utilisateur>.github.io/tournoi-des-rois/`.
+Le dépôt se déploie via **GitHub Actions** (workflow `.github/workflows/pages.yml`), qui publie le
+dossier `public/`.
+
+1. Une seule fois : Dépôt → **Settings → Pages** → **Source** = **« GitHub Actions »**.
+2. Chaque `git push` sur `main` déclenche le workflow et redéploie automatiquement le site.
 
 Tous les chemins sont **relatifs** pour fonctionner sous le sous-chemin `/<repo>/`.
 
